@@ -16,7 +16,6 @@ struct SpinningCube {
         window.view.clearDepth = 1.0
 
         let device = window.device
-        let queue = device.makeCommandQueue()!
         let library = try await device.makeLibrary(source: shaderSource, options: nil)
 
         let pipelineDescriptor = MTLRenderPipelineDescriptor()
@@ -33,29 +32,20 @@ struct SpinningCube {
 
         let start = CACurrentMediaTime()
 
-        await window.show { view in
-            guard let pass = view.currentRenderPassDescriptor,
-                let drawable = view.currentDrawable,
-                let buffer = queue.makeCommandBuffer(),
-                let encoder = buffer.makeRenderCommandEncoder(descriptor: pass)
-            else { return .continue }
-
+        await window.show { (frame: Frame) in
             let t = Float(CACurrentMediaTime() - start)
-            let size = view.drawableSize
+            let size = frame.view.drawableSize
             let aspect = size.height > 0 ? Float(size.width / size.height) : 1
             let model = rotationY(t * 0.9) * rotationX(t * 0.6)
             let viewMatrix = translation(0, 0, -4)
             let projection = perspective(fovY: .pi / 4, aspect: aspect, near: 0.1, far: 100)
             var uniforms = Uniforms(mvp: projection * viewMatrix * model, model: model)
 
-            encoder.setRenderPipelineState(pipeline)
-            encoder.setDepthStencilState(depthState)
-            encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
-            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 36)
-            encoder.endEncoding()
-
-            buffer.present(drawable)
-            buffer.commit()
+            frame.encoder.setRenderPipelineState(pipeline)
+            frame.encoder.setDepthStencilState(depthState)
+            frame.encoder.setVertexBytes(
+                &uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
+            frame.encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 36)
             return .continue
         }
     }

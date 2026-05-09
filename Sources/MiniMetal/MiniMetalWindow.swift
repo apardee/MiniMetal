@@ -136,6 +136,61 @@ public final class MiniMetalWindow {
         runUntilClosed()
     }
 
+    /// Displays the window and awaits its closure, driving each frame from a
+    /// closure that receives a fully-prepared ``Frame``.
+    ///
+    /// This overload owns a command queue internally, acquires a render pass
+    /// descriptor / drawable / command buffer / encoder for each frame, and
+    /// presents+commits after the closure returns. Frames where the drawable
+    /// isn't ready are skipped silently.
+    ///
+    /// Return ``FrameAction/continue`` to keep rendering or
+    /// ``FrameAction/quit`` to close the window and return from this call.
+    ///
+    /// - Parameter render: The per-frame render closure.
+    public func show(_ render: @MainActor @escaping (Frame) -> FrameAction) async {
+        guard let queue = device.makeCommandQueue() else {
+            assertionFailure("MTLDevice.makeCommandQueue() returned nil")
+            return
+        }
+        await show { (view: MTKView) -> FrameAction in
+            guard let frame = view.beginFrame(queue: queue) else { return .continue }
+            defer { frame.finish() }
+            return render(frame)
+        }
+    }
+
+    /// Displays the window and awaits its closure, driving each frame from a
+    /// closure that receives a fully-prepared ``Frame4`` (Metal 4).
+    ///
+    /// This overload owns a Metal 4 command queue, command buffer, and
+    /// command allocator internally — single-frame-in-flight, matching
+    /// Apple's reference sample. Frames where the drawable isn't ready are
+    /// skipped silently.
+    ///
+    /// For higher throughput (multi-frame-in-flight with a pool of
+    /// allocators), drop down to ``MetalKit/MTKView/beginFrame4(queue:commandBuffer:allocator:)``
+    /// directly.
+    ///
+    /// - Parameter render: The per-frame render closure.
+    @available(macOS 26.0, *)
+    public func show(_ render: @MainActor @escaping (Frame4) -> FrameAction) async {
+        guard let queue = device.makeMTL4CommandQueue(),
+            let buffer = device.makeCommandBuffer(),
+            let allocator = device.makeCommandAllocator()
+        else {
+            assertionFailure("Metal 4 setup failed (queue / buffer / allocator)")
+            return
+        }
+        await show { (view: MTKView) -> FrameAction in
+            guard let frame = view.beginFrame4(
+                queue: queue, commandBuffer: buffer, allocator: allocator)
+            else { return .continue }
+            defer { frame.finish(queue: queue) }
+            return render(frame)
+        }
+    }
+
     /// Programmatically closes the window. If a ``show()`` call is currently
     /// awaiting, it will return shortly after.
     public func close() {
