@@ -1,9 +1,67 @@
 // Spinning cube
 
-import Metal
 import MetalKit
 import MiniMetal
 import simd
+
+@MetalLayout
+private struct Uniforms {
+    var mvp: simd_float4x4
+    var model: simd_float4x4
+}
+
+// 36 hard-coded cube vertices (12 triangles), normals derived in the fragment
+// shader from screen-space position derivatives so we don't need a normal
+// attribute or a vertex buffer at all. `using: [Uniforms.self]` prepends the
+// MSL declaration synthesized from the Swift struct above so layout stays
+// in sync without a hand-mirrored copy.
+private let shader = #shader(using: [Uniforms.self], """
+    #include <metal_stdlib>
+    using namespace metal;
+
+    constant float3 cubePositions[36] = {
+        // -Z
+        float3(-1,-1,-1), float3( 1,-1,-1), float3( 1, 1,-1),
+        float3(-1,-1,-1), float3( 1, 1,-1), float3(-1, 1,-1),
+        // +Z
+        float3(-1,-1, 1), float3( 1, 1, 1), float3( 1,-1, 1),
+        float3(-1,-1, 1), float3(-1, 1, 1), float3( 1, 1, 1),
+        // -X
+        float3(-1,-1,-1), float3(-1, 1,-1), float3(-1, 1, 1),
+        float3(-1,-1,-1), float3(-1, 1, 1), float3(-1,-1, 1),
+        // +X
+        float3( 1,-1,-1), float3( 1, 1, 1), float3( 1, 1,-1),
+        float3( 1,-1,-1), float3( 1,-1, 1), float3( 1, 1, 1),
+        // -Y
+        float3(-1,-1,-1), float3(-1,-1, 1), float3( 1,-1, 1),
+        float3(-1,-1,-1), float3( 1,-1, 1), float3( 1,-1,-1),
+        // +Y
+        float3(-1, 1,-1), float3( 1, 1, 1), float3(-1, 1, 1),
+        float3(-1, 1,-1), float3( 1, 1,-1), float3( 1, 1, 1),
+    };
+
+    struct VertexOut {
+        float4 position [[position]];
+        float3 worldPos;
+    };
+
+    vertex VertexOut vertex_main(uint vid [[vertex_id]],
+                                 constant Uniforms& u [[buffer(0)]]) {
+        float3 p = cubePositions[vid];
+        VertexOut out;
+        out.position = u.mvp * float4(p, 1);
+        out.worldPos = (u.model * float4(p, 1)).xyz;
+        return out;
+    }
+
+    fragment float4 fragment_main(VertexOut in [[stage_in]]) {
+        float3 N = normalize(cross(dfdx(in.worldPos), dfdy(in.worldPos)));
+        float3 L = normalize(float3(0.4, 0.8, 0.6));
+        float diff = saturate(dot(N, L));
+        float3 base = float3(0.3, 0.6, 1.0);
+        return float4(base * (0.2 + 0.8 * diff), 1);
+    }
+    """)
 
 @main
 struct SpinningCube {
@@ -15,20 +73,13 @@ struct SpinningCube {
         window.view.clearColor = MTLClearColor(red: 0.05, green: 0.05, blue: 0.08, alpha: 1.0)
         window.view.clearDepth = 1.0
 
-        let device = window.device
-        let library = try await device.makeLibrary(source: shaderSource, options: nil)
-
-        let pipelineDescriptor = MTLRenderPipelineDescriptor()
-        pipelineDescriptor.vertexFunction = library.makeFunction(name: "vertex_main")
-        pipelineDescriptor.fragmentFunction = library.makeFunction(name: "fragment_main")
-        pipelineDescriptor.colorAttachments[0].pixelFormat = window.view.colorPixelFormat
-        pipelineDescriptor.depthAttachmentPixelFormat = window.view.depthStencilPixelFormat
-        let pipeline = try await device.makeRenderPipelineState(descriptor: pipelineDescriptor)
-
-        let depthDescriptor = MTLDepthStencilDescriptor()
-        depthDescriptor.depthCompareFunction = .less
-        depthDescriptor.isDepthWriteEnabled = true
-        let depthState = device.makeDepthStencilState(descriptor: depthDescriptor)!
+        let pipeline = try await window.device.makeRenderPipeline(
+            shader: shader,
+            vertex: "vertex_main",
+            fragment: "fragment_main",
+            color: window.view.colorPixelFormat,
+            depth: window.view.depthStencilPixelFormat)
+        let depthState = window.device.makeDepthStencilState()
 
         let start = CACurrentMediaTime()
 
@@ -39,23 +90,15 @@ struct SpinningCube {
             let model = rotationY(t * 0.9) * rotationX(t * 0.6)
             let viewMatrix = translation(0, 0, -4)
             let projection = perspective(fovY: .pi / 4, aspect: aspect, near: 0.1, far: 100)
-            var uniforms = Uniforms(mvp: projection * viewMatrix * model, model: model)
+            let uniforms = Uniforms(mvp: projection * viewMatrix * model, model: model)
 
             frame.encoder.setRenderPipelineState(pipeline)
             frame.encoder.setDepthStencilState(depthState)
-            frame.encoder.setVertexBytes(
-                &uniforms, length: MemoryLayout<Uniforms>.stride, index: 0)
+            frame.encoder.setVertexUniforms(uniforms, index: 0)
             frame.encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 36)
             return .continue
         }
     }
-}
-
-// MARK: - Uniforms
-
-private struct Uniforms {
-    var mvp: simd_float4x4
-    var model: simd_float4x4
 }
 
 // MARK: - Matrix helpers (column-major, right-handed, Metal clip space [0, 1])
@@ -97,61 +140,3 @@ private func perspective(fovY: Float, aspect: Float, near: Float, far: Float) ->
         SIMD4(0, 0, z, -1),
         SIMD4(0, 0, w, 0))
 }
-
-// MARK: - Shader
-
-// 36 hard-coded cube vertices (12 triangles), normals derived in the fragment
-// shader from screen-space position derivatives so we don't need a normal
-// attribute or a vertex buffer at all.
-private let shaderSource = """
-    #include <metal_stdlib>
-    using namespace metal;
-
-    constant float3 cubePositions[36] = {
-        // -Z
-        float3(-1,-1,-1), float3( 1,-1,-1), float3( 1, 1,-1),
-        float3(-1,-1,-1), float3( 1, 1,-1), float3(-1, 1,-1),
-        // +Z
-        float3(-1,-1, 1), float3( 1, 1, 1), float3( 1,-1, 1),
-        float3(-1,-1, 1), float3(-1, 1, 1), float3( 1, 1, 1),
-        // -X
-        float3(-1,-1,-1), float3(-1, 1,-1), float3(-1, 1, 1),
-        float3(-1,-1,-1), float3(-1, 1, 1), float3(-1,-1, 1),
-        // +X
-        float3( 1,-1,-1), float3( 1, 1, 1), float3( 1, 1,-1),
-        float3( 1,-1,-1), float3( 1,-1, 1), float3( 1, 1, 1),
-        // -Y
-        float3(-1,-1,-1), float3(-1,-1, 1), float3( 1,-1, 1),
-        float3(-1,-1,-1), float3( 1,-1, 1), float3( 1,-1,-1),
-        // +Y
-        float3(-1, 1,-1), float3( 1, 1, 1), float3(-1, 1, 1),
-        float3(-1, 1,-1), float3( 1, 1,-1), float3( 1, 1, 1),
-    };
-
-    struct Uniforms {
-        float4x4 mvp;
-        float4x4 model;
-    };
-
-    struct VertexOut {
-        float4 position [[position]];
-        float3 worldPos;
-    };
-
-    vertex VertexOut vertex_main(uint vid [[vertex_id]],
-                                 constant Uniforms& u [[buffer(0)]]) {
-        float3 p = cubePositions[vid];
-        VertexOut out;
-        out.position = u.mvp * float4(p, 1);
-        out.worldPos = (u.model * float4(p, 1)).xyz;
-        return out;
-    }
-
-    fragment float4 fragment_main(VertexOut in [[stage_in]]) {
-        float3 N = normalize(cross(dfdx(in.worldPos), dfdy(in.worldPos)));
-        float3 L = normalize(float3(0.4, 0.8, 0.6));
-        float diff = saturate(dot(N, L));
-        float3 base = float3(0.3, 0.6, 1.0);
-        return float4(base * (0.2 + 0.8 * diff), 1);
-    }
-    """
