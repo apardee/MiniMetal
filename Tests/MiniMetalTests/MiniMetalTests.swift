@@ -2,6 +2,7 @@ import Testing
 import CoreGraphics
 import Metal
 import MetalKit
+import simd
 @testable import MiniMetal
 
 // MARK: - Resolution
@@ -136,27 +137,84 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     }
 }
 
-// MARK: - Macros (phase 1 scaffolding)
+// MARK: - #shader (phase 1 scaffolding)
 
-@MetalLayout
-private struct StubUniforms {
-    var x: Float
-}
-
-@Suite struct MacroStubTests {
-    @Test func shaderMacroRoundTripsSource() {
+@Suite struct ShaderMacroTests {
+    @Test func roundTripsSource() {
         let s = #shader("vertex void v_main() {}")
         #expect(s.source == "vertex void v_main() {}")
     }
+}
 
-    @Test func metalLayoutSynthesizesPlaceholderDeclaration() {
-        // Phase 1 stub: empty until phase 2 implements the field translator.
-        #expect(StubUniforms.mslDeclaration == "")
+// MARK: - @MetalLayout
+
+@MetalLayout
+private struct OneFloat {
+    var x: Float
+}
+
+@MetalLayout
+private struct CubeUniforms {
+    var mvp: simd_float4x4
+    var model: simd_float4x4
+}
+
+/// Mixes scalar and simd_float3 to exercise the float3-padded-to-vec4 rule:
+/// without the size-16 alignment, c and d would land at MSL offsets that
+/// don't match Swift's, silently corrupting GPU reads.
+@MetalLayout
+private struct AssortedFields {
+    var a: Float
+    var b: simd_float3
+    var c: UInt32
+    var d: Bool
+}
+
+@MetalLayout
+private struct GenericSIMD {
+    var p: SIMD4<Float>
+    var q: SIMD2<Int32>
+}
+
+@Suite struct MetalLayoutTests {
+    @Test func conformsToMetalUniform() {
+        // Compile-time check: assignment fails if the macro didn't add
+        // the conformance.
+        let _: any MetalUniform.Type = OneFloat.self
     }
 
-    @Test func metalLayoutAddsMetalUniformConformance() {
-        // Compile-time check: the assignment fails if the macro didn't add
-        // the conformance.
-        let _: any MetalUniform.Type = StubUniforms.self
+    @Test func emitsScalarStruct() {
+        #expect(OneFloat.mslDeclaration == """
+            struct OneFloat {
+                float x;
+            };
+            """)
+    }
+
+    @Test func emitsMatrixStruct() {
+        #expect(CubeUniforms.mslDeclaration == """
+            struct CubeUniforms {
+                float4x4 mvp;
+                float4x4 model;
+            };
+            """)
+        #expect(MemoryLayout<CubeUniforms>.stride == 128)
+    }
+
+    @Test func emitsAssortedStruct() {
+        let decl = AssortedFields.mslDeclaration
+        #expect(decl.contains("float a;"))
+        #expect(decl.contains("float3 b;"))
+        #expect(decl.contains("uint c;"))
+        #expect(decl.contains("bool d;"))
+        // Touching mslDeclaration above ran the stride precondition; if we
+        // got here, Swift and MSL strides agree.
+        #expect(MemoryLayout<AssortedFields>.stride == 48)
+    }
+
+    @Test func mapsGenericSIMD() {
+        let decl = GenericSIMD.mslDeclaration
+        #expect(decl.contains("float4 p;"))
+        #expect(decl.contains("int2 q;"))
     }
 }

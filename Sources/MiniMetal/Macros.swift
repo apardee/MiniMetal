@@ -39,8 +39,10 @@ public macro shader(_ source: String) -> MetalShader = #externalMacro(
 )
 
 /// Marks a Swift struct as a Metal uniform, synthesizing an `mslDeclaration`
-/// matching the struct's layout and a conformance to `MetalUniform`.
-@attached(member, names: named(mslDeclaration))
+/// matching the struct's layout and a conformance to `MetalUniform`. A
+/// runtime stride check fires once on first access to `mslDeclaration` and
+/// preconditions if Swift's layout drifts from the computed MSL layout.
+@attached(member, names: named(mslDeclaration), arbitrary)
 @attached(extension, conformances: MetalUniform)
 public macro MetalLayout() = #externalMacro(
     module: "MiniMetalMacrosPlugin",
