@@ -1,23 +1,47 @@
 // Public surface for MiniMetal's compile-time shader sugar.
 //
-// Phase 1 ships scaffolding only:
+// Phase 3 ships:
 //
-// - `#shader("...")` round-trips its source string into a `MetalShader` value.
-// - `@MetalLayout` synthesizes an empty `mslDeclaration` and a `MetalUniform`
-//   conformance. The real field-by-field translation lands in phase 2.
+// - `#shader("...")` scans the MSL source for vertex / fragment / kernel
+//   entry points and returns a `MetalShader` whose `.vertex`, `.fragment`,
+//   and `.compute` members expose the discovered names as compile-time
+//   typed properties — typos become compile errors.
+// - `@MetalLayout` synthesizes `mslDeclaration` from a Swift struct's
+//   stored properties and a runtime stride check that fires on first use.
 //
-// Both macros are re-exported here so callers only need `import MiniMetal`.
+// Both are re-exported here so callers only need `import MiniMetal`.
 
-/// A bundle of Metal Shading Language source plus structured entry-point
-/// metadata. Currently only carries the source string; phase 3 will add
-/// typed `vertex`/`fragment`/`compute` entry-point handles synthesized by
-/// the `#shader` macro.
+/// A bundle of Metal Shading Language source plus the entry-point names
+/// the `#shader` macro discovered in it. Function names are exposed as
+/// `[String]` arrays — typos at call sites surface when Metal can't find
+/// the function at pipeline-creation time, not at Swift compile time.
+///
+/// Production extraction: pass `shader.source` to a `.metal` file and
+/// replace `shader.vertex` references with the bare `"vertex_main"`
+/// literals you'd write in plain Metal. No further refactoring needed.
 public struct MetalShader: Sendable {
     /// The MSL source that will be passed to `MTLDevice.makeLibrary(source:)`.
     public let source: String
 
-    public init(source: String) {
+    /// Names of declared `vertex` functions, in source order.
+    public let vertex: [String]
+
+    /// Names of declared `fragment` functions, in source order.
+    public let fragment: [String]
+
+    /// Names of declared `kernel` (compute) functions, in source order.
+    public let compute: [String]
+
+    public init(
+        source: String,
+        vertex: [String] = [],
+        fragment: [String] = [],
+        compute: [String] = []
+    ) {
         self.source = source
+        self.vertex = vertex
+        self.fragment = fragment
+        self.compute = compute
     }
 }
 
@@ -31,7 +55,8 @@ public protocol MetalUniform {
 }
 
 /// Embeds Metal Shading Language source inline in Swift code, validated at
-/// build time and surfaced as a `MetalShader` value.
+/// build time and surfaced as a `MetalShader` whose `.vertex`, `.fragment`,
+/// and `.compute` arrays list the declared entry-point names.
 @freestanding(expression)
 public macro shader(_ source: String) -> MetalShader = #externalMacro(
     module: "MiniMetalMacrosPlugin",

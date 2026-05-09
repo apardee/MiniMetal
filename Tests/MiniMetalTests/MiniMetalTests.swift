@@ -137,12 +137,57 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     }
 }
 
-// MARK: - #shader (phase 1 scaffolding)
+// MARK: - #shader
 
 @Suite struct ShaderMacroTests {
-    @Test func roundTripsSource() {
-        let s = #shader("vertex void v_main() {}")
-        #expect(s.source == "vertex void v_main() {}")
+    @Test func extractsSingleVertexAndFragment() {
+        let s = #shader("""
+            vertex VertexOut vertex_main(uint vid [[vertex_id]]) { return VertexOut(); }
+            fragment float4 fragment_main(VertexOut in [[stage_in]]) { return float4(0); }
+            """)
+        #expect(s.vertex == ["vertex_main"])
+        #expect(s.fragment == ["fragment_main"])
+        #expect(s.compute.isEmpty)
+    }
+
+    @Test func extractsMultipleEntryPointsInDeclarationOrder() {
+        let s = #shader("""
+            vertex VertexOut v_a(uint vid [[vertex_id]]) { return VertexOut(); }
+            vertex VertexOut v_b(uint vid [[vertex_id]]) { return VertexOut(); }
+            fragment float4 f_a(VertexOut in [[stage_in]]) { return float4(0); }
+            fragment float4 f_b(VertexOut in [[stage_in]]) { return float4(0); }
+            """)
+        #expect(s.vertex == ["v_a", "v_b"])
+        #expect(s.fragment == ["f_a", "f_b"])
+    }
+
+    @Test func extractsKernelEntryPoints() {
+        let s = #shader("""
+            kernel void compute_main(uint tid [[thread_position_in_grid]]) {}
+            """)
+        #expect(s.compute == ["compute_main"])
+        #expect(s.vertex.isEmpty)
+        #expect(s.fragment.isEmpty)
+    }
+
+    @Test func skipsCommentedDeclarations() {
+        let s = #shader("""
+            // vertex VertexOut commented_out(uint vid [[vertex_id]]) { return VertexOut(); }
+            /* fragment float4 also_commented(VertexOut in [[stage_in]]) { return float4(0); } */
+            vertex VertexOut real_vertex(uint vid [[vertex_id]]) { return VertexOut(); }
+            """)
+        #expect(s.vertex == ["real_vertex"])
+        #expect(s.fragment.isEmpty)
+    }
+
+    @Test func sourceIsRoundTrippedVerbatim() {
+        let body = """
+            vertex VertexOut v(uint vid [[vertex_id]]) { return VertexOut(); }
+            """
+        let s = #shader("""
+            vertex VertexOut v(uint vid [[vertex_id]]) { return VertexOut(); }
+            """)
+        #expect(s.source == body)
     }
 }
 

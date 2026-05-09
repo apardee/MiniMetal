@@ -13,18 +13,101 @@ struct MiniMetalMacrosPlugin: CompilerPlugin {
 
 // MARK: - #shader
 
-/// Phase 1 stub: round-trips its string argument into a `MetalShader` value
-/// with empty entry-point sets. Real entry-point extraction lands in phase 3.
 public struct ShaderMacro: ExpressionMacro {
     public static func expansion(
         of node: some FreestandingMacroExpansionSyntax,
         in context: some MacroExpansionContext
     ) throws -> ExprSyntax {
-        guard let source = node.arguments.first?.expression else {
-            return #"MetalShader(source: "")"#
+        guard let firstArg = node.arguments.first?.expression else {
+            context.diagnose(.init(
+                node: Syntax(node),
+                message: ShaderDiagnostic.missingSource
+            ))
+            return emptyShaderExpr()
         }
-        return "MetalShader(source: \(source))"
+
+        guard let source = extractStaticStringContent(firstArg) else {
+            context.diagnose(.init(
+                node: Syntax(firstArg),
+                message: ShaderDiagnostic.notLiteralString
+            ))
+            return emptyShaderExpr()
+        }
+
+        let entries = scanEntryPoints(in: source)
+        if entries.isEmpty {
+            context.diagnose(.init(
+                node: Syntax(firstArg),
+                message: ShaderDiagnostic.noEntryPointsFound
+            ))
+        }
+
+        let vertexLiteral = renderStringArray(entries.vertex)
+        let fragmentLiteral = renderStringArray(entries.fragment)
+        let computeLiteral = renderStringArray(entries.compute)
+
+        return """
+            MetalShader(
+                source: \(firstArg),
+                vertex: \(raw: vertexLiteral),
+                fragment: \(raw: fragmentLiteral),
+                compute: \(raw: computeLiteral)
+            )
+            """
     }
+}
+
+private func renderStringArray(_ names: [String]) -> String {
+    if names.isEmpty { return "[]" }
+    let quoted = names.map { #""\#($0)""# }.joined(separator: ", ")
+    return "[\(quoted)]"
+}
+
+private func extractStaticStringContent(_ expr: ExprSyntax) -> String? {
+    guard let strLit = expr.as(StringLiteralExprSyntax.self) else { return nil }
+    var content = ""
+    for segment in strLit.segments {
+        guard let textSeg = segment.as(StringSegmentSyntax.self) else {
+            // Interpolation segment — phase 3 doesn't support \(...) in source.
+            return nil
+        }
+        content += textSeg.content.text
+    }
+    return content
+}
+
+private func emptyShaderExpr() -> ExprSyntax {
+    "MetalShader(source: \"\")"
+}
+
+struct ShaderDiagnostic: DiagnosticMessage {
+    let message: String
+    let diagnosticID: MessageID
+    let severity: DiagnosticSeverity
+
+    private init(_ message: String, id: String, severity: DiagnosticSeverity = .error) {
+        self.message = message
+        self.diagnosticID = MessageID(domain: "MiniMetal.shader", id: id)
+        self.severity = severity
+    }
+
+    static let missingSource = ShaderDiagnostic(
+        "#shader requires a string literal source argument.",
+        id: "missingSource"
+    )
+
+    static let notLiteralString = ShaderDiagnostic(
+        "#shader source must be a plain string literal — interpolations and " +
+        "non-literal expressions aren't supported in this version.",
+        id: "notLiteralString"
+    )
+
+    static let noEntryPointsFound = ShaderDiagnostic(
+        "#shader source declares no `vertex`, `fragment`, or `kernel` " +
+        "functions — the resulting handle won't expose any entry points.",
+        id: "noEntryPointsFound",
+        severity: .warning
+    )
 }
 
 // MARK: - @MetalLayout
