@@ -135,3 +135,28 @@ final class CountingRenderer: MiniMetalWindowDelegate {
         #expect(window.delegate == nil)
     }
 }
+
+// MARK: - Macros (phase 1 scaffolding)
+
+@MetalLayout
+private struct StubUniforms {
+    var x: Float
+}
+
+@Suite struct MacroStubTests {
+    @Test func shaderMacroRoundTripsSource() {
+        let s = #shader("vertex void v_main() {}")
+        #expect(s.source == "vertex void v_main() {}")
+    }
+
+    @Test func metalLayoutSynthesizesPlaceholderDeclaration() {
+        // Phase 1 stub: empty until phase 2 implements the field translator.
+        #expect(StubUniforms.mslDeclaration == "")
+    }
+
+    @Test func metalLayoutAddsMetalUniformConformance() {
+        // Compile-time check: the assignment fails if the macro didn't add
+        // the conformance.
+        let _: any MetalUniform.Type = StubUniforms.self
+    }
+}
