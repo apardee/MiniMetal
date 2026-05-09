@@ -56,7 +56,7 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     }
 }
 
-@Suite struct MiniMetalWindowTests {
+@Suite struct WindowTests {
     /// Skip window construction tests on hosts where Metal is unavailable
     /// (e.g., headless CI without GPU access).
     static var hasMetal: Bool {
@@ -66,7 +66,7 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     @MainActor
     @Test func createsWindowWithTitleAndSize() throws {
         try #require(Self.hasMetal)
-        let window = try MiniMetalWindow(
+        let window = try Window(
             title: "Test Renderer",
             resolution: .init(width: 640, height: 480))
         #expect(window.window.title == "Test Renderer")
@@ -78,7 +78,7 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     @MainActor
     @Test func exposesMetalDevice() throws {
         try #require(Self.hasMetal)
-        let window = try MiniMetalWindow(
+        let window = try Window(
             title: "Devices",
             resolution: .init(width: 100, height: 100))
         // Identity check: `device` should be the same MTLDevice as the view's.
@@ -88,7 +88,7 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     @MainActor
     @Test func acceptsCustomDevice() throws {
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let window = try MiniMetalWindow(
+        let window = try Window(
             title: "Custom",
             resolution: .init(width: 100, height: 100),
             device: device)
@@ -98,7 +98,7 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     @MainActor
     @Test func delegateRoundTrips() throws {
         try #require(Self.hasMetal)
-        let window = try MiniMetalWindow(
+        let window = try Window(
             title: "Delegate",
             resolution: .init(width: 100, height: 100))
         let renderer = CountingRenderer()
@@ -118,7 +118,7 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     @MainActor
     @Test func delegateIsHeldWeakly() throws {
         try #require(Self.hasMetal)
-        let window = try MiniMetalWindow(
+        let window = try Window(
             title: "Weak",
             resolution: .init(width: 100, height: 100))
 

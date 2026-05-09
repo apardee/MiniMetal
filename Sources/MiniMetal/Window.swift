@@ -5,11 +5,11 @@ import MetalKit
 /// A simple macOS window backed by an `MTKView`, designed for Metal rendering
 /// demos and prototypes.
 ///
-/// `MiniMetalWindow` collapses the usual AppKit ceremony — `NSApplication`
+/// `Window` collapses the usual AppKit ceremony — `NSApplication`
 /// activation, window creation, `MTKViewDelegate` conformance, and run-loop
 /// management — into two lines of user code:
 ///
-///     let window = MiniMetalWindow(
+///     let window = try Window(
 ///         title: "Demo",
 ///         resolution: .init(width: 640, height: 480))
 ///     await window.show { view in
@@ -32,7 +32,7 @@ import MetalKit
 /// The underlying ``window`` and ``view`` are exposed for callers that need
 /// direct access to AppKit / MetalKit features that aren't surfaced here.
 @MainActor
-public final class MiniMetalWindow {
+public final class Window {
 
     /// Window-related errors.
     public enum Error: Swift.Error {
@@ -301,7 +301,7 @@ final class DrawAdapter: NSObject, MTKViewDelegate {
     }
 }
 
-/// Bridges `NSWindowDelegate` so the owning ``MiniMetalWindow`` can break out
+/// Bridges `NSWindowDelegate` so the owning ``Window`` can break out
 /// of its run loop when the window is dismissed.
 @MainActor
 final class WindowAdapter: NSObject, NSWindowDelegate {

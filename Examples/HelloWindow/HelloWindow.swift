@@ -8,7 +8,7 @@ import MiniMetal
 struct HelloWindow {
 
     static func main() async throws {
-        let window = try MiniMetalWindow(
+        let window = try Window(
             title: "MiniMetal — Hello Window",
             resolution: .init(width: 1024, height: 768))
         window.view.clearColor = MTLClearColor(red: 1.0, green: 0.0, blue: 1.0, alpha: 1.0)

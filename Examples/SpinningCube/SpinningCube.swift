@@ -8,7 +8,7 @@ import simd
 @main
 struct SpinningCube {
     static func main() async throws {
-        let window = try MiniMetalWindow(
+        let window = try Window(
             title: "MiniMetal — Spinning Cube",
             resolution: .init(width: 800, height: 600))
         window.view.depthStencilPixelFormat = .depth32Float

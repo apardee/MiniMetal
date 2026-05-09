@@ -2,7 +2,7 @@ import CoreGraphics
 import MetalKit
 
 /// Receives drawable-resize and per-frame draw callbacks from a
-/// ``MiniMetalWindow``.
+/// ``Window``.
 ///
 /// The shape mirrors `MTKViewDelegate` so that existing rendering code can be
 /// adapted with minimal change, but it does **not** require `NSObjectProtocol`
