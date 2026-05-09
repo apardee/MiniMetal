@@ -145,25 +145,29 @@ public final class MiniMetalWindow {
         var done = false
         windowAdapter.onClose = { done = true }
         drawAdapter.onQuit = { [weak self] in
-            // Route through the standard close path so windowWillClose fires
-            // and the window tears itself down normally.
             self?.window.performClose(nil)
         }
 
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
 
-        // Drive everything ourselves: NSApp.run() and the swift @main async
-        // runtime each want to own the main thread, and they don't cooperate —
-        // NSApp.run() leaves MTKView's display link silent, and any call to
-        // NSApp.nextEvent under the swift runtime's pump kills the display
-        // link too. Disabling the view's automatic display link and stepping
-        // the loop ourselves sidesteps both.
         view.isPaused = true
         view.enableSetNeedsDisplay = false
 
-        let frameInterval: CFTimeInterval = 1.0 / 60.0
+        // Drive draws from a CADisplayLink so rendering tracks the display's
+        // native refresh rate (60Hz, 120Hz ProMotion, etc.). MTKView's own
+        // display link doesn't fire under our manual run loop, but a
+        // CADisplayLink we install ourselves does.
+        let driver = DisplayLinkDriver(view: view)
+        let displayLink = view.displayLink(target: driver, selector: #selector(DisplayLinkDriver.tick(_:)))
+        displayLink.add(to: .main, forMode: .common)
+        defer { displayLink.invalidate() }
+
         while !done {
+            // NSApp.run() / Swift's @main async runtime each want to own the
+            // main thread but don't cooperate, so we drain AppKit's event
+            // queue ourselves to keep window controls (close, resize,
+            // miniaturize) responsive.
             while let event = NSApp.nextEvent(
                 matching: .any,
                 until: Date.distantPast,
@@ -173,11 +177,9 @@ public final class MiniMetalWindow {
                 NSApp.sendEvent(event)
             }
 
-            view.draw()
-
-            // Pace the loop and let timers, dispatch sources, and AppKit
-            // run-loop work (e.g., live-resize tracking) execute.
-            CFRunLoopRunInMode(.defaultMode, frameInterval, false)
+            // Park in the run loop until something happens — a display-link
+            // tick, a new event, a timer, or the timeout.
+            CFRunLoopRunInMode(.defaultMode, 0.1, false)
         }
     }
 
@@ -191,6 +193,20 @@ public final class MiniMetalWindow {
             app.setActivationPolicy(.regular)
         }
         app.finishLaunching()
+    }
+}
+
+/// Bridges `CADisplayLink`'s `@objc` selector callback to a `view.draw()` call.
+@MainActor
+final class DisplayLinkDriver: NSObject {
+    weak var view: MTKView?
+
+    init(view: MTKView) {
+        self.view = view
+    }
+
+    @objc func tick(_ sender: CADisplayLink) {
+        view?.draw()
     }
 }
 
