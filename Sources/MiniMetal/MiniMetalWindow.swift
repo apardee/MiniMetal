@@ -33,6 +33,13 @@ import MetalKit
 /// direct access to AppKit / MetalKit features that aren't surfaced here.
 @MainActor
 public final class MiniMetalWindow {
+
+    /// Window-related errors.
+    public enum Error: Swift.Error {
+        /// Error creating during window construction.
+        case deviceCreationFailed
+    }
+
     /// The underlying `NSWindow`. Exposed for advanced configuration; most
     /// callers shouldn't need to touch it.
     public let window: NSWindow
@@ -73,11 +80,9 @@ public final class MiniMetalWindow {
         title: String,
         resolution: Resolution,
         device: MTLDevice? = nil
-    ) {
+    ) throws(Error) {
         guard let metalDevice = device ?? MTLCreateSystemDefaultDevice() else {
-            preconditionFailure(
-                "MiniMetal requires a Metal-capable system; MTLCreateSystemDefaultDevice() returned nil."
-            )
+            throw .deviceCreationFailed
         }
 
         let frame = NSRect(x: 0, y: 0, width: resolution.width, height: resolution.height)
@@ -159,7 +164,8 @@ public final class MiniMetalWindow {
         // display link doesn't fire under our manual run loop, but a
         // CADisplayLink we install ourselves does.
         let driver = DisplayLinkDriver(view: view)
-        let displayLink = view.displayLink(target: driver, selector: #selector(DisplayLinkDriver.tick(_:)))
+        let displayLink = view.displayLink(
+            target: driver, selector: #selector(DisplayLinkDriver.tick(_:)))
         displayLink.add(to: .main, forMode: .common)
         defer { displayLink.invalidate() }
 
