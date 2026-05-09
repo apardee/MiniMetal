@@ -245,6 +245,73 @@ private struct CrossCheckLights {
     }
 }
 
+// MARK: - Pipeline / depth / encoder conveniences
+
+@MetalLayout
+private struct EncoderUniforms {
+    var x: Float
+}
+
+@Suite struct PipelineConvenienceTests {
+    static var hasMetal: Bool { MTLCreateSystemDefaultDevice() != nil }
+
+    @Test func makeDepthStencilStateDefaults() throws {
+        try #require(Self.hasMetal)
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        // No-arg form should use less + write — the Z-buffer demos want.
+        let state = device.makeDepthStencilState()
+        // No way to introspect descriptor through MTLDepthStencilState, so
+        // the assertion is "this returned a non-optional state."
+        _ = state
+    }
+
+    @Test func makeDepthStencilStateCustom() throws {
+        try #require(Self.hasMetal)
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let disabled = device.makeDepthStencilState(compare: .always, write: false)
+        _ = disabled
+    }
+
+    @Test func makeRenderPipelineFromShader() async throws {
+        try #require(Self.hasMetal)
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let shader = #shader("""
+            #include <metal_stdlib>
+            using namespace metal;
+            vertex float4 v_pass(uint vid [[vertex_id]]) { return float4(0, 0, 0, 1); }
+            fragment float4 f_white() { return float4(1); }
+            """)
+        let pipeline = try await device.makeRenderPipeline(
+            shader: shader,
+            vertex: "v_pass",
+            fragment: "f_white",
+            color: .bgra8Unorm)
+        _ = pipeline
+    }
+
+    @Test func makeComputePipelineFromShader() async throws {
+        try #require(Self.hasMetal)
+        let device = try #require(MTLCreateSystemDefaultDevice())
+        let shader = #shader("""
+            #include <metal_stdlib>
+            using namespace metal;
+            kernel void noop(uint tid [[thread_position_in_grid]]) {}
+            """)
+        let pipeline = try await device.makeComputePipeline(shader: shader, function: "noop")
+        _ = pipeline
+    }
+
+    @Test func encoderUniformExtensionsCompile() {
+        // Type-check verification: the methods exist with the right
+        // signatures even though we have no live encoder to invoke them on.
+        let renderEncoder: MTLRenderCommandEncoder? = nil
+        renderEncoder?.setVertexUniforms(EncoderUniforms(x: 1), index: 0)
+        renderEncoder?.setFragmentUniforms(EncoderUniforms(x: 1), index: 0)
+        let computeEncoder: MTLComputeCommandEncoder? = nil
+        computeEncoder?.setUniforms(EncoderUniforms(x: 1), index: 0)
+    }
+}
+
 // MARK: - @MetalLayout
 
 @MetalLayout
