@@ -33,6 +33,25 @@ func scanEntryPoints(in source: String) -> EntryPoints {
     return result
 }
 
+/// Returns the names of types referenced from address-space-qualified slots
+/// in the source — e.g. `constant Uniforms& u` or `device Light* lights`.
+/// These are the slots where `@MetalLayout` types are typically passed in,
+/// so they're the right place to check that everything used is declared.
+func scanReferencedExternalTypes(in source: String) -> [String] {
+    let cleaned = stripComments(source)
+    let pattern = #"\b(?:constant|device|threadgroup|thread)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[*&]"#
+    return matchSingleCaptureNames(pattern: pattern, in: cleaned)
+}
+
+/// Returns the names of `struct T { ... }` declarations in the source.
+/// Used to suppress "type not in `using:`" warnings when the user has
+/// already declared the type inline in MSL.
+func scanDeclaredStructs(in source: String) -> Set<String> {
+    let cleaned = stripComments(source)
+    let pattern = #"\bstruct\s+([A-Za-z_][A-Za-z0-9_]*)\b"#
+    return Set(matchSingleCaptureNames(pattern: pattern, in: cleaned))
+}
+
 // MARK: - Internals
 
 private func matchDeclarations(keyword: String, in source: String) -> [String] {
@@ -41,9 +60,11 @@ private func matchDeclarations(keyword: String, in source: String) -> [String] {
     //
     //   \b(keyword)[\s]+ [^\s\(\)]+ [\s]+ ([A-Za-z_][A-Za-z0-9_]*) [\s]* \(
     let pattern = #"\b\#(keyword)[\s]+[^\s\(\)]+[\s]+([A-Za-z_][A-Za-z0-9_]*)[\s]*\("#
-    guard let regex = try? NSRegularExpression(pattern: pattern) else {
-        return []
-    }
+    return matchSingleCaptureNames(pattern: pattern, in: source)
+}
+
+private func matchSingleCaptureNames(pattern: String, in source: String) -> [String] {
+    guard let regex = try? NSRegularExpression(pattern: pattern) else { return [] }
     let ns = source as NSString
     let matches = regex.matches(in: source, range: NSRange(location: 0, length: ns.length))
     var names: [String] = []

@@ -57,8 +57,19 @@ public protocol MetalUniform {
 /// Embeds Metal Shading Language source inline in Swift code, validated at
 /// build time and surfaced as a `MetalShader` whose `.vertex`, `.fragment`,
 /// and `.compute` arrays list the declared entry-point names.
+///
+/// Pass `@MetalLayout`-conforming Swift types via `using:` to have their
+/// MSL declarations prepended to the source automatically — keeping the
+/// Swift struct as the single source of truth for layout.
+///
+///     #shader(using: [Uniforms.self], """
+///         vertex VertexOut vertex_main(constant Uniforms& u [[buffer(0)]]) { ... }
+///         """)
 @freestanding(expression)
-public macro shader(_ source: String) -> MetalShader = #externalMacro(
+public macro shader(
+    using: [any MetalUniform.Type] = [],
+    _ source: String
+) -> MetalShader = #externalMacro(
     module: "MiniMetalMacrosPlugin",
     type: "ShaderMacro"
 )

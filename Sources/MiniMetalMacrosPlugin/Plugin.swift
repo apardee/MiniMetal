@@ -18,7 +18,21 @@ public struct ShaderMacro: ExpressionMacro {
         of node: some FreestandingMacroExpansionSyntax,
         in context: some MacroExpansionContext
     ) throws -> ExprSyntax {
-        guard let firstArg = node.arguments.first?.expression else {
+        var sourceArg: ExprSyntax?
+        var usingArg: ExprSyntax?
+
+        for arg in node.arguments {
+            switch arg.label?.text {
+            case "using":
+                usingArg = arg.expression
+            case nil:
+                sourceArg = arg.expression
+            default:
+                continue
+            }
+        }
+
+        guard let firstArg = sourceArg else {
             context.diagnose(.init(
                 node: Syntax(node),
                 message: ShaderDiagnostic.missingSource
@@ -34,6 +48,21 @@ public struct ShaderMacro: ExpressionMacro {
             return emptyShaderExpr()
         }
 
+        let usingTypeNames: [String]
+        if let usingArg {
+            if let names = extractTypeMetatypeNames(from: usingArg) {
+                usingTypeNames = names
+            } else {
+                context.diagnose(.init(
+                    node: Syntax(usingArg),
+                    message: ShaderDiagnostic.usingNotArrayLiteral
+                ))
+                usingTypeNames = []
+            }
+        } else {
+            usingTypeNames = []
+        }
+
         let entries = scanEntryPoints(in: source)
         if entries.isEmpty {
             context.diagnose(.init(
@@ -42,13 +71,34 @@ public struct ShaderMacro: ExpressionMacro {
             ))
         }
 
+        let referenced = scanReferencedExternalTypes(in: source)
+        let declared = scanDeclaredStructs(in: source)
+        let usingSet = Set(usingTypeNames)
+
+        for ref in referenced where !declared.contains(ref) && !usingSet.contains(ref) {
+            context.diagnose(.init(
+                node: Syntax(firstArg),
+                message: ShaderDiagnostic.typeReferencedNotInUsing(ref)
+            ))
+        }
+        if let usingArg {
+            let referencedSet = Set(referenced)
+            for usingName in usingTypeNames where !referencedSet.contains(usingName) {
+                context.diagnose(.init(
+                    node: Syntax(usingArg),
+                    message: ShaderDiagnostic.unusedUsingType(usingName)
+                ))
+            }
+        }
+
         let vertexLiteral = renderStringArray(entries.vertex)
         let fragmentLiteral = renderStringArray(entries.fragment)
         let computeLiteral = renderStringArray(entries.compute)
+        let sourceExpr = renderSourceExpression(userSource: firstArg, prepend: usingTypeNames)
 
         return """
             MetalShader(
-                source: \(firstArg),
+                source: \(sourceExpr),
                 vertex: \(raw: vertexLiteral),
                 fragment: \(raw: fragmentLiteral),
                 compute: \(raw: computeLiteral)
@@ -63,6 +113,16 @@ private func renderStringArray(_ names: [String]) -> String {
     return "[\(quoted)]"
 }
 
+/// Builds the runtime source expression: each prepended `T.mslDeclaration`
+/// followed by a newline, then the original user source literal.
+private func renderSourceExpression(userSource: ExprSyntax, prepend: [String]) -> ExprSyntax {
+    if prepend.isEmpty { return userSource }
+    let prefix = prepend
+        .map { #"\#($0).mslDeclaration + "\n""# }
+        .joined(separator: " + ")
+    return "\(raw: prefix) + \(userSource)"
+}
+
 private func extractStaticStringContent(_ expr: ExprSyntax) -> String? {
     guard let strLit = expr.as(StringLiteralExprSyntax.self) else { return nil }
     var content = ""
@@ -74,6 +134,24 @@ private func extractStaticStringContent(_ expr: ExprSyntax) -> String? {
         content += textSeg.content.text
     }
     return content
+}
+
+/// Extracts the type names from a `[T1.self, T2.self, ...]` array literal.
+/// Returns nil if the expression isn't an array literal of `Type.self`
+/// member-access expressions.
+private func extractTypeMetatypeNames(from expr: ExprSyntax) -> [String]? {
+    guard let arrayExpr = expr.as(ArrayExprSyntax.self) else { return nil }
+    var names: [String] = []
+    for element in arrayExpr.elements {
+        guard let memberAccess = element.expression.as(MemberAccessExprSyntax.self),
+              memberAccess.declName.baseName.text == "self",
+              let base = memberAccess.base?.as(DeclReferenceExprSyntax.self)
+        else {
+            return nil
+        }
+        names.append(base.baseName.text)
+    }
+    return names
 }
 
 private func emptyShaderExpr() -> ExprSyntax {
@@ -108,6 +186,30 @@ struct ShaderDiagnostic: DiagnosticMessage {
         id: "noEntryPointsFound",
         severity: .warning
     )
+
+    static let usingNotArrayLiteral = ShaderDiagnostic(
+        "#shader `using:` must be an array literal of `Type.self` expressions.",
+        id: "usingNotArrayLiteral"
+    )
+
+    static func typeReferencedNotInUsing(_ name: String) -> ShaderDiagnostic {
+        ShaderDiagnostic(
+            "#shader: source references `\(name)` from an address-space slot " +
+            "but it isn't declared in the source nor passed via `using:`. " +
+            "Add `\(name).self` to `using:` so its MSL declaration is prepended.",
+            id: "typeReferencedNotInUsing",
+            severity: .warning
+        )
+    }
+
+    static func unusedUsingType(_ name: String) -> ShaderDiagnostic {
+        ShaderDiagnostic(
+            "#shader: type `\(name)` is in `using:` but isn't referenced in " +
+            "the MSL source — its declaration will be prepended unused.",
+            id: "unusedUsingType",
+            severity: .warning
+        )
+    }
 }
 
 // MARK: - @MetalLayout

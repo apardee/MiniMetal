@@ -191,6 +191,60 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     }
 }
 
+// MARK: - #shader cross-checking with @MetalLayout
+
+@MetalLayout
+private struct CrossCheckUniforms {
+    var mvp: simd_float4x4
+}
+
+@MetalLayout
+private struct CrossCheckLights {
+    var direction: simd_float4
+}
+
+@Suite struct ShaderUsingTests {
+    @Test func prependsSingleUniformDeclaration() {
+        let s = #shader(using: [CrossCheckUniforms.self], """
+            vertex VertexOut v(constant CrossCheckUniforms& u [[buffer(0)]]) { return VertexOut(); }
+            fragment float4 f(VertexOut in [[stage_in]]) { return float4(0); }
+            """)
+        #expect(s.source.contains("struct CrossCheckUniforms"))
+        #expect(s.source.contains("float4x4 mvp;"))
+        // User MSL is preserved after the prepended declaration.
+        #expect(s.source.contains("vertex VertexOut v"))
+        // Entry-point extraction still works.
+        #expect(s.vertex == ["v"])
+        #expect(s.fragment == ["f"])
+    }
+
+    @Test func prependsMultipleUniformsInOrder() {
+        let s = #shader(using: [CrossCheckUniforms.self, CrossCheckLights.self], """
+            vertex VertexOut v(constant CrossCheckUniforms& u [[buffer(0)]],
+                               constant CrossCheckLights& l [[buffer(1)]]) { return VertexOut(); }
+            """)
+        let uniformsRange = s.source.range(of: "struct CrossCheckUniforms")
+        let lightsRange = s.source.range(of: "struct CrossCheckLights")
+        let userRange = s.source.range(of: "vertex VertexOut v")
+        #expect(uniformsRange != nil)
+        #expect(lightsRange != nil)
+        #expect(userRange != nil)
+        // Uniforms before Lights before user code.
+        #expect(uniformsRange!.lowerBound < lightsRange!.lowerBound)
+        #expect(lightsRange!.lowerBound < userRange!.lowerBound)
+    }
+
+    @Test func emptyUsingPreservesOriginalSource() {
+        let body = """
+            vertex VertexOut v(uint vid [[vertex_id]]) { return VertexOut(); }
+            """
+        let s = #shader("""
+            vertex VertexOut v(uint vid [[vertex_id]]) { return VertexOut(); }
+            """)
+        #expect(s.source == body)
+    }
+}
+
 // MARK: - @MetalLayout
 
 @MetalLayout
