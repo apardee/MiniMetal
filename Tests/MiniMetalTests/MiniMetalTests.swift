@@ -1,33 +1,10 @@
-import Testing
 import CoreGraphics
 import Metal
 import MetalKit
+import Testing
 import simd
+
 @testable import MiniMetal
-
-// MARK: - Resolution
-
-@Suite struct ResolutionTests {
-    @Test func storesDimensions() {
-        let r = Resolution(width: 640, height: 480)
-        #expect(r.width == 640)
-        #expect(r.height == 480)
-    }
-
-    @Test func convertsToCGSize() {
-        let r = Resolution(width: 1280, height: 720)
-        #expect(r.size == CGSize(width: 1280, height: 720))
-    }
-
-    @Test func equatableAndHashable() {
-        let a = Resolution(width: 100, height: 200)
-        let b = Resolution(width: 100, height: 200)
-        let c = Resolution(width: 200, height: 100)
-        #expect(a == b)
-        #expect(a != c)
-        #expect(a.hashValue == b.hashValue)
-    }
-}
 
 // MARK: - FrameAction
 
@@ -109,7 +86,8 @@ final class CountingRenderer: MiniMetalWindowDelegate {
         // Driving the underlying MTKViewDelegate (via the internal adapter)
         // should forward to the user delegate without going through the
         // run loop.
-        window.view.delegate?.mtkView(window.view, drawableSizeWillChange: CGSize(width: 200, height: 100))
+        window.view.delegate?.mtkView(
+            window.view, drawableSizeWillChange: CGSize(width: 200, height: 100))
         window.view.delegate?.draw(in: window.view)
 
         #expect(renderer.drawCount == 1)
@@ -141,7 +119,8 @@ final class CountingRenderer: MiniMetalWindowDelegate {
 
 @Suite struct ShaderMacroTests {
     @Test func extractsSingleVertexAndFragment() {
-        let s = #shader("""
+        let s = #shader(
+            """
             vertex VertexOut vertex_main(uint vid [[vertex_id]]) { return VertexOut(); }
             fragment float4 fragment_main(VertexOut in [[stage_in]]) { return float4(0); }
             """)
@@ -151,7 +130,8 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     }
 
     @Test func extractsMultipleEntryPointsInDeclarationOrder() {
-        let s = #shader("""
+        let s = #shader(
+            """
             vertex VertexOut v_a(uint vid [[vertex_id]]) { return VertexOut(); }
             vertex VertexOut v_b(uint vid [[vertex_id]]) { return VertexOut(); }
             fragment float4 f_a(VertexOut in [[stage_in]]) { return float4(0); }
@@ -162,7 +142,8 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     }
 
     @Test func extractsKernelEntryPoints() {
-        let s = #shader("""
+        let s = #shader(
+            """
             kernel void compute_main(uint tid [[thread_position_in_grid]]) {}
             """)
         #expect(s.compute == ["compute_main"])
@@ -171,7 +152,8 @@ final class CountingRenderer: MiniMetalWindowDelegate {
     }
 
     @Test func skipsCommentedDeclarations() {
-        let s = #shader("""
+        let s = #shader(
+            """
             // vertex VertexOut commented_out(uint vid [[vertex_id]]) { return VertexOut(); }
             /* fragment float4 also_commented(VertexOut in [[stage_in]]) { return float4(0); } */
             vertex VertexOut real_vertex(uint vid [[vertex_id]]) { return VertexOut(); }
@@ -184,7 +166,8 @@ final class CountingRenderer: MiniMetalWindowDelegate {
         let body = """
             vertex VertexOut v(uint vid [[vertex_id]]) { return VertexOut(); }
             """
-        let s = #shader("""
+        let s = #shader(
+            """
             vertex VertexOut v(uint vid [[vertex_id]]) { return VertexOut(); }
             """)
         #expect(s.source == body)
@@ -205,7 +188,9 @@ private struct CrossCheckLights {
 
 @Suite struct ShaderUsingTests {
     @Test func prependsSingleUniformDeclaration() {
-        let s = #shader(using: [CrossCheckUniforms.self], """
+        let s = #shader(
+            using: [CrossCheckUniforms.self],
+            """
             vertex VertexOut v(constant CrossCheckUniforms& u [[buffer(0)]]) { return VertexOut(); }
             fragment float4 f(VertexOut in [[stage_in]]) { return float4(0); }
             """)
@@ -219,7 +204,9 @@ private struct CrossCheckLights {
     }
 
     @Test func prependsMultipleUniformsInOrder() {
-        let s = #shader(using: [CrossCheckUniforms.self, CrossCheckLights.self], """
+        let s = #shader(
+            using: [CrossCheckUniforms.self, CrossCheckLights.self],
+            """
             vertex VertexOut v(constant CrossCheckUniforms& u [[buffer(0)]],
                                constant CrossCheckLights& l [[buffer(1)]]) { return VertexOut(); }
             """)
@@ -238,7 +225,8 @@ private struct CrossCheckLights {
         let body = """
             vertex VertexOut v(uint vid [[vertex_id]]) { return VertexOut(); }
             """
-        let s = #shader("""
+        let s = #shader(
+            """
             vertex VertexOut v(uint vid [[vertex_id]]) { return VertexOut(); }
             """)
         #expect(s.source == body)
@@ -250,7 +238,9 @@ private struct CrossCheckLights {
         // `using namespace metal;`. The macro must inject those above the
         // generated declarations, otherwise live MSL compilation explodes
         // (the SpinningCube regression that motivated this test).
-        let s = #shader(using: [CrossCheckUniforms.self], """
+        let s = #shader(
+            using: [CrossCheckUniforms.self],
+            """
             vertex VertexOut v(constant CrossCheckUniforms& u [[buffer(0)]]) { return VertexOut(); }
             """)
         let header = s.source.range(of: "#include <metal_stdlib>")
@@ -294,7 +284,8 @@ private struct EncoderUniforms {
     @Test func makeRenderPipelineFromShader() async throws {
         try #require(Self.hasMetal)
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let shader = #shader("""
+        let shader = #shader(
+            """
             #include <metal_stdlib>
             using namespace metal;
             vertex float4 v_pass(uint vid [[vertex_id]]) { return float4(0, 0, 0, 1); }
@@ -311,7 +302,8 @@ private struct EncoderUniforms {
     @Test func makeComputePipelineFromShader() async throws {
         try #require(Self.hasMetal)
         let device = try #require(MTLCreateSystemDefaultDevice())
-        let shader = #shader("""
+        let shader = #shader(
+            """
             #include <metal_stdlib>
             using namespace metal;
             kernel void noop(uint tid [[thread_position_in_grid]]) {}
@@ -369,20 +361,22 @@ private struct GenericSIMD {
     }
 
     @Test func emitsScalarStruct() {
-        #expect(OneFloat.mslDeclaration == """
-            struct OneFloat {
-                float x;
-            };
-            """)
+        #expect(
+            OneFloat.mslDeclaration == """
+                struct OneFloat {
+                    float x;
+                };
+                """)
     }
 
     @Test func emitsMatrixStruct() {
-        #expect(CubeUniforms.mslDeclaration == """
-            struct CubeUniforms {
-                float4x4 mvp;
-                float4x4 model;
-            };
-            """)
+        #expect(
+            CubeUniforms.mslDeclaration == """
+                struct CubeUniforms {
+                    float4x4 mvp;
+                    float4x4 model;
+                };
+                """)
         #expect(MemoryLayout<CubeUniforms>.stride == 128)
     }
 

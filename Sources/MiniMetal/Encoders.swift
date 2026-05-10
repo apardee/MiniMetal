@@ -12,14 +12,16 @@ extension MTLRenderCommandEncoder {
 
     /// Sets `value` at the given vertex buffer index using its Swift stride.
     public func setVertexUniforms<T: MetalUniform>(_ value: T, index: Int) {
-        var v = value
-        setVertexBytes(&v, length: MemoryLayout<T>.stride, index: index)
+        withUnsafeBytes(of: value) { buffer in
+            setVertexBytes(buffer.baseAddress!, length: MemoryLayout<T>.stride, index: index)
+        }
     }
 
     /// Sets `value` at the given fragment buffer index using its Swift stride.
     public func setFragmentUniforms<T: MetalUniform>(_ value: T, index: Int) {
-        var v = value
-        setFragmentBytes(&v, length: MemoryLayout<T>.stride, index: index)
+        withUnsafeBytes(of: value) { buffer in
+            setFragmentBytes(buffer.baseAddress!, length: MemoryLayout<T>.stride, index: index)
+        }
     }
 }
 
@@ -27,7 +29,8 @@ extension MTLComputeCommandEncoder {
 
     /// Sets `value` at the given buffer index using its Swift stride.
     public func setUniforms<T: MetalUniform>(_ value: T, index: Int) {
-        var v = value
-        setBytes(&v, length: MemoryLayout<T>.stride, index: index)
+        withUnsafeBytes(of: value) { buffer in
+            setBytes(buffer.baseAddress!, length: MemoryLayout<T>.stride, index: index)
+        }
     }
 }

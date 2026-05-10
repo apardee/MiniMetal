@@ -78,7 +78,7 @@ public final class Window {
     ///     non-default GPU.
     public init(
         title: String,
-        resolution: Resolution,
+        resolution: CGSize,
         device: MTLDevice? = nil
     ) throws(Error) {
         guard let metalDevice = device ?? MTLCreateSystemDefaultDevice() else {
@@ -183,8 +183,9 @@ public final class Window {
             return
         }
         await show { (view: MTKView) -> FrameAction in
-            guard let frame = view.beginFrame4(
-                queue: queue, commandBuffer: buffer, allocator: allocator)
+            guard
+                let frame = view.beginFrame4(
+                    queue: queue, commandBuffer: buffer, allocator: allocator)
             else { return .continue }
             defer { frame.finish(queue: queue) }
             return render(frame)
