@@ -6,7 +6,7 @@ import MetalKit
 ///
 /// Acquire one with ``MetalKit/MTKView/beginFrame(queue:)`` (low-level) or
 /// receive one in the closure passed to
-/// ``MiniMetalWindow/show(_:)-(MTKView)->FrameAction``'s ``Frame`` overload
+/// ``Window/show(_:)-(MTKView)->FrameAction``'s ``Frame`` overload
 /// (high-level).
 public struct Frame {
     /// The view this frame is rendering into.

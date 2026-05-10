@@ -1,11 +1,11 @@
 import CoreGraphics
 
-/// The pixel dimensions of a ``MiniMetalWindow``'s content area.
+/// The pixel dimensions of a ``Window``'s content area.
 ///
 /// `Resolution` is a lightweight value type so that callers can construct it
 /// inline without importing CoreGraphics:
 ///
-///     let window = MiniMetalWindow(
+///     let window = try Window(
 ///         title: "Demo",
 ///         resolution: .init(width: 1280, height: 720))
 public struct Resolution: Sendable, Hashable {

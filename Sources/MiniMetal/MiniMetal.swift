@@ -8,7 +8,7 @@
 //
 //     import MiniMetal
 //
-//     let window = MiniMetalWindow(
+//     let window = try Window(
 //         title: "Test Renderer",
 //         resolution: .init(width: 640, height: 480))
 //
@@ -17,4 +17,4 @@
 //         return .continue
 //     }
 //
-// See ``MiniMetalWindow`` for the full API.
+// See ``Window`` for the full API.

@@ -1,13 +1,12 @@
-// Public surface for MiniMetal's compile-time shader sugar.
+// Public surface for MiniMetal's compile-time shader sugar:
 //
-// Phase 3 ships:
-//
-// - `#shader("...")` scans the MSL source for vertex / fragment / kernel
-//   entry points and returns a `MetalShader` whose `.vertex`, `.fragment`,
-//   and `.compute` members expose the discovered names as compile-time
-//   typed properties — typos become compile errors.
-// - `@MetalLayout` synthesizes `mslDeclaration` from a Swift struct's
-//   stored properties and a runtime stride check that fires on first use.
+// - `#shader("...")` scans MSL source for vertex / fragment / kernel
+//   entry points and returns a `MetalShader` carrying the source plus the
+//   discovered names. Pass `using:` to prepend `@MetalLayout` types'
+//   declarations automatically.
+// - `@MetalLayout` synthesizes a matching MSL struct declaration from a
+//   Swift struct's stored properties, plus a runtime stride check that
+//   fires on first access to `mslDeclaration`.
 //
 // Both are re-exported here so callers only need `import MiniMetal`.
 

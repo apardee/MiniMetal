@@ -9,7 +9,7 @@ import MetalKit
 ///
 /// Acquire one with ``MetalKit/MTKView/beginFrame4(queue:commandBuffer:allocator:)``
 /// (low-level) or receive one in the closure passed to
-/// ``MiniMetalWindow/show(_:)-(Frame4)->FrameAction`` (high-level).
+/// ``Window/show(_:)-(Frame4)->FrameAction`` (high-level).
 @available(macOS 26.0, *)
 public struct Frame4 {
     /// The view this frame is rendering into.
