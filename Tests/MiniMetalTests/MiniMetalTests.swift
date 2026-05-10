@@ -243,6 +243,25 @@ private struct CrossCheckLights {
             """)
         #expect(s.source == body)
     }
+
+    @Test func usingPrependsMSLHeaders() {
+        // The auto-prepended struct uses unqualified MSL type names like
+        // `float4x4`, which only resolve after `#include <metal_stdlib>` and
+        // `using namespace metal;`. The macro must inject those above the
+        // generated declarations, otherwise live MSL compilation explodes
+        // (the SpinningCube regression that motivated this test).
+        let s = #shader(using: [CrossCheckUniforms.self], """
+            vertex VertexOut v(constant CrossCheckUniforms& u [[buffer(0)]]) { return VertexOut(); }
+            """)
+        let header = s.source.range(of: "#include <metal_stdlib>")
+        let usingDir = s.source.range(of: "using namespace metal;")
+        let structDecl = s.source.range(of: "struct CrossCheckUniforms")
+        #expect(header != nil)
+        #expect(usingDir != nil)
+        #expect(structDecl != nil)
+        #expect(header!.lowerBound < usingDir!.lowerBound)
+        #expect(usingDir!.lowerBound < structDecl!.lowerBound)
+    }
 }
 
 // MARK: - Pipeline / depth / encoder conveniences

@@ -113,14 +113,18 @@ private func renderStringArray(_ names: [String]) -> String {
     return "[\(quoted)]"
 }
 
-/// Builds the runtime source expression: each prepended `T.mslDeclaration`
-/// followed by a newline, then the original user source literal.
+/// Builds the runtime source expression. When `using:` types are listed,
+/// prepends `#include <metal_stdlib>` and `using namespace metal;` so the
+/// auto-generated MSL declarations (which use unqualified `float4x4` etc.)
+/// can resolve those names — the user's source can repeat the include and
+/// the using-directive harmlessly.
 private func renderSourceExpression(userSource: ExprSyntax, prepend: [String]) -> ExprSyntax {
     if prepend.isEmpty { return userSource }
+    let header = ##""#include <metal_stdlib>\nusing namespace metal;\n""##
     let prefix = prepend
         .map { #"\#($0).mslDeclaration + "\n""# }
         .joined(separator: " + ")
-    return "\(raw: prefix) + \(userSource)"
+    return "\(raw: header) + \(raw: prefix) + \(userSource)"
 }
 
 private func extractStaticStringContent(_ expr: ExprSyntax) -> String? {
