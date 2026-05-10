@@ -33,6 +33,11 @@ let package = Package(
             dependencies: ["MiniMetalMacrosPlugin"]
         ),
         .executableTarget(
+            name: "HelloTriangle",
+            dependencies: ["MiniMetal"],
+            path: "Examples/HelloTriangle"
+        ),
+        .executableTarget(
             name: "HelloWindow",
             dependencies: ["MiniMetal"],
             path: "Examples/HelloWindow"
