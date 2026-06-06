@@ -45,7 +45,7 @@ let package = Package(
         .macOS(.v14)
     ],
     dependencies: [
-        .package(url: "https://github.com/apardee/MiniMetal.git", branch: "main"),
+        .package(url: "https://github.com/apardee/MiniMetal.git", from: "0.1.0"),
     ],
     targets: [
         .executableTarget(
