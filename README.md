@@ -1,8 +1,8 @@
 # MiniMetal
 
 [![CI](https://github.com/apardee/MiniMetal/actions/workflows/ci.yml/badge.svg)](https://github.com/apardee/MiniMetal/actions/workflows/ci.yml)
-[![Swift 6.2+](https://img.shields.io/badge/Swift-6.2+-F05138?logo=swift&logoColor=white)](https://www.swift.org)
-[![macOS 14+](https://img.shields.io/badge/macOS-14+-000000?logo=apple&logoColor=white)](https://www.apple.com/macos)
+[![Swift Versions](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fapardee%2FMiniMetal%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/apardee/MiniMetal)
+[![Platforms](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fapardee%2FMiniMetal%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/apardee/MiniMetal)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A minimal Metal package for building Swift rendering demos on macOS. Spin up a new Swift project, add the `MiniMetal` dependency, and initialize a window that provides an `MTKView` — without interacting with any of the platform UI frameworks directly.
