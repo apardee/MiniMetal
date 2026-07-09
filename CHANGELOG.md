@@ -4,6 +4,15 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- The `#shader` and `@MetalLayout` macros are now **opt-in** via a new
+  `MiniMetalMacros` product. `import MiniMetal` no longer pulls in the macro
+  plugin or swift-syntax, so quick demos that only use the window API build
+  without that one-time cost. To use the macros, depend on `MiniMetalMacros`
+  (which re-exports `MiniMetal`) and `import MiniMetalMacros`.
+
 ## [0.1.0] - 2026-06-06
 
 Initial release.

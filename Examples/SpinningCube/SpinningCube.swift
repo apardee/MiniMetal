@@ -1,7 +1,7 @@
 // Spinning cube
 
 import MetalKit
-import MiniMetal
+import MiniMetalMacros
 import simd
 
 @MetalLayout

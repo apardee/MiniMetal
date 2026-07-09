@@ -24,6 +24,10 @@ struct HelloWindow {
 
 That's a working app. Swift 6.2, macOS 14+.
 
+The `MiniMetal` product carries no macros and no swift-syntax dependency, so this
+path builds fast — ideal for quick demos. The `#shader` / `@MetalLayout` macros
+are [opt-in](#inline-shaders) via a separate `MiniMetalMacros` product.
+
 ## From scratch
 
 Create a new executable package and step into it:
@@ -79,7 +83,38 @@ A 1024×768 window opens, cleared to magenta every frame.
 
 ## Inline shaders
 
-`@MetalLayout` annotates a Swift struct so its memory layout is mirrored as an MSL `struct` declaration, with a runtime stride check that fires once on first use if Swift and MSL disagree. `#shader` embeds MSL source as a string literal, scans it for `vertex` / `fragment` / `kernel` entry points, and (with `using:`) prepends the `@MetalLayout` declarations so the Swift struct is the single source of truth for layout.
+The `#shader` and `@MetalLayout` macros are **opt-in**. They rely on
+[swift-syntax](https://github.com/swiftlang/swift-syntax), which is a heavy
+one-time build cost, so it's kept off the default `import MiniMetal` path. To use
+them, depend on the `MiniMetalMacros` product instead of `MiniMetal` and change
+your import — nothing else changes, because `MiniMetalMacros` re-exports the whole
+window API:
+
+```swift
+// Package.swift — one word changes:
+.executableTarget(
+    name: "SpinningCube",
+    dependencies: ["MiniMetalMacros"]   // was "MiniMetal"
+)
+```
+
+```swift
+import MiniMetalMacros                   // was: import MiniMetal
+// Window, Frame, #shader, @MetalLayout — all available.
+```
+
+Prefer to stay on the fast path? `MetalShader` has a public initializer, so you
+can hand-build a shader handle from a plain string and still use every pipeline
+convenience below — no macros required:
+
+```swift
+import MiniMetal
+
+let shader = MetalShader(source: mslString, vertex: ["vertex_main"], fragment: ["fragment_main"])
+let pipeline = try await device.makeRenderPipeline(shader: shader, vertex: "vertex_main", fragment: "fragment_main")
+```
+
+With the macros opted in, `@MetalLayout` annotates a Swift struct so its memory layout is mirrored as an MSL `struct` declaration, with a runtime stride check that fires once on first use if Swift and MSL disagree. `#shader` embeds MSL source as a string literal, scans it for `vertex` / `fragment` / `kernel` entry points, and (with `using:`) prepends the `@MetalLayout` declarations so the Swift struct is the single source of truth for layout.
 
 ```swift
 @MetalLayout

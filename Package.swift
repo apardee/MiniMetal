@@ -13,7 +13,14 @@ let package = Package(
         .library(
             name: "MiniMetal",
             targets: ["MiniMetal"]
-        )
+        ),
+        // Opt-in: adds the `#shader` / `@MetalLayout` macros (and their
+        // swift-syntax build cost) on top of core MiniMetal. Depend on this
+        // product instead of "MiniMetal" to use the inline-shader sugar.
+        .library(
+            name: "MiniMetalMacros",
+            targets: ["MiniMetalMacros"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "601.0.0"),
@@ -28,9 +35,16 @@ let package = Package(
                 .product(name: "SwiftDiagnostics", package: "swift-syntax"),
             ]
         ),
+        // Core library — no macro plugin, so `import MiniMetal` carries no
+        // swift-syntax build cost.
         .target(
-            name: "MiniMetal",
-            dependencies: ["MiniMetalMacrosPlugin"]
+            name: "MiniMetal"
+        ),
+        // Opt-in macro surface. Re-exports MiniMetal, so `import MiniMetalMacros`
+        // brings the window API along with the `#shader` / `@MetalLayout` macros.
+        .target(
+            name: "MiniMetalMacros",
+            dependencies: ["MiniMetalMacrosPlugin", "MiniMetal"]
         ),
         .executableTarget(
             name: "HelloTriangle",
@@ -44,12 +58,12 @@ let package = Package(
         ),
         .executableTarget(
             name: "SpinningCube",
-            dependencies: ["MiniMetal"],
+            dependencies: ["MiniMetalMacros"],
             path: "Examples/SpinningCube"
         ),
         .testTarget(
             name: "MiniMetalTests",
-            dependencies: ["MiniMetal"]
+            dependencies: ["MiniMetalMacros"]
         ),
     ]
 )

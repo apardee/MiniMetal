@@ -4,6 +4,7 @@ import MetalKit
 import Testing
 import simd
 
+import MiniMetalMacros
 @testable import MiniMetal
 
 // MARK: - FrameAction
