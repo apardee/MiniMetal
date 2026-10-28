@@ -4,6 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Widened the swift-syntax requirement to `601.0.0..<605.0.0` (was `601.x` only).
+  `MiniMetalMacros` now resolves alongside packages that need newer swift-syntax,
+  and on Swift 6.4 it resolves to 604.x, which SwiftPM can use as a prebuilt
+  binary instead of compiling swift-syntax from source.
+
 ## [0.2.0] - 2026-07-09
 
 ### Added
