@@ -276,28 +276,26 @@ final class DisplayLinkDriver: NSObject {
 
 /// Bridges `MTKViewDelegate` (a nonisolated, NSObjectProtocol-constrained
 /// protocol) to either a ``MiniMetalWindowDelegate`` or a per-frame closure.
+/// The conformance is main-actor isolated: MTKView calls its delegate on the
+/// main thread, and the compiler enforces that at the `@objc` entry points.
 @MainActor
-final class DrawAdapter: NSObject, MTKViewDelegate {
+final class DrawAdapter: NSObject, @MainActor MTKViewDelegate {
     weak var userDelegate: (any MiniMetalWindowDelegate)?
     var closure: (@MainActor (MTKView) -> FrameAction)?
     var onQuit: (@MainActor () -> Void)?
 
-    nonisolated func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        MainActor.assumeIsolated {
-            userDelegate?.mtkView(view, drawableSizeWillChange: size)
-        }
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+        userDelegate?.mtkView(view, drawableSizeWillChange: size)
     }
 
-    nonisolated func draw(in view: MTKView) {
-        MainActor.assumeIsolated {
-            if let closure {
-                let action = closure(view)
-                if action == .quit {
-                    onQuit?()
-                }
-            } else {
-                userDelegate?.draw(in: view)
+    func draw(in view: MTKView) {
+        if let closure {
+            let action = closure(view)
+            if action == .quit {
+                onQuit?()
             }
+        } else {
+            userDelegate?.draw(in: view)
         }
     }
 }
@@ -308,9 +306,7 @@ final class DrawAdapter: NSObject, MTKViewDelegate {
 final class WindowAdapter: NSObject, NSWindowDelegate {
     var onClose: (@MainActor () -> Void)?
 
-    nonisolated func windowWillClose(_ notification: Notification) {
-        MainActor.assumeIsolated {
-            onClose?()
-        }
+    func windowWillClose(_ notification: Notification) {
+        onClose?()
     }
 }
